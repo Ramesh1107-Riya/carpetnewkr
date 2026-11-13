@@ -424,3 +424,452 @@ RETURN (LASTKEY() = 13 .OR. LASTKEY() = 134 .OR. LASTKEY() = 5 .OR. ;
 
 * End of Function EnterF12
 
+*=====================================================================
+* SPLIT ISSUE BY SQMT  -  Issue Dyed Yarn to SUPPLIER (wiissue.scx)
+*
+* One entry on the form (OL No, quality, colour, Net Wt) is saved as one
+* Wiissue row per OL of the same ORDER FORM, the Net Wt being shared in
+* proportion to SqMt.  All rows of one entry carry the same Wiissue.GRPID.
+*
+* Order Form group (same selection as rordformyarn.prg): Casupord.Issdt and
+* Supplier the same as the entered OL, Cabuyord Design, Colour and Quality
+* the same, Cstatus On-Loom / Distri.  The entered OL is always included.
+*
+* Needs the GRPID column in Wiissue -> run   DO wiissue_addgrp   once.
+* Rows with a blank GRPID (all old data) are never touched by this code.
+*
+* Called from the form (BUTTONSET1.UpdateRows / cmdEdit.Click / cmdExit):
+*   WiPostSave    after an Add or Edit row was saved  -> split / re-split
+*   WiDeleteGroup on Delete of a split row            -> delete whole entry
+*   WiGroupInfo   on Edit of a split row              -> show the entry TOTAL
+*=====================================================================
+
+* GRPID of the current Wiissue row ("" if none, a temporary marker, or no GRPID column)
+FUNCTION WiCurGrp
+LOCAL lcGrp
+IF !USED("wiissue") .OR. TYPE("wiissue.grpid") = "U"
+	RETURN ""
+ENDIF
+lcGrp = ALLTRIM(wiissue.grpid)
+RETURN IIF(LEFT(lcGrp, 1) = "~", "", lcGrp)
+* End of Function WiCurGrp
+
+
+* Second, unbuffered handle on Wiissue (alias wi_w) used for the split work
+FUNCTION WiOpenW
+IF USED("wi_w")
+	USE IN wi_w
+ENDIF
+USE wiissue AGAIN SHARED IN 0 ALIAS wi_w
+RETURN USED("wi_w")
+* End of Function WiOpenW
+
+
+* Fill cursor cWiSib with the OLs of the Order Form of tcOlNo (+ their SqMt).
+* Returns the number of OLs (1 when the OL has no Order Form partners).
+FUNCTION WiSiblings
+LPARAMETERS tcOlNo
+LOCAL lnSel, lcAnsi, ldIss, lcSup, lcDes, lcCol, lcQlt
+lnSel = SELECT()
+lcAnsi = SET("ANSI")
+SET ANSI ON
+tcOlNo = ALLTRIM(tcOlNo)
+IF USED("cWiSib")
+	USE IN cWiSib
+ENDIF
+CREATE CURSOR cWiSib (ol_no C(15), sqmt N(8,2), share N(11,3), taken L)
+
+SELECT s.issdt, s.supplier, b.design, b.colour, b.quality, b.sqmt ;
+	FROM casupord s, cabuyord b ;
+	WHERE b.ol_no = s.ol_no AND s.ol_no = tcOlNo ;
+	INTO CURSOR cWiKey
+
+IF RECCOUNT("cWiKey") = 0
+	INSERT INTO cWiSib (ol_no) VALUES (tcOlNo)
+ELSE
+	ldIss = cWiKey.issdt
+	lcSup = cWiKey.supplier
+	lcDes = cWiKey.design
+	lcCol = cWiKey.colour
+	lcQlt = cWiKey.quality
+	IF !EMPTY(ldIss) .AND. !EMPTY(lcSup)
+		SELECT s.ol_no, b.sqmt ;
+			FROM casupord s, cabuyord b ;
+			WHERE b.ol_no = s.ol_no AND s.issdt = ldIss AND s.supplier = lcSup ;
+			AND b.design = lcDes AND b.colour = lcCol AND b.quality = lcQlt ;
+			AND (b.cstatus = "On-Loom" OR b.cstatus = "Distri") ;
+			ORDER BY s.ol_no ;
+			INTO CURSOR cWiSib0
+		SELECT cWiSib0
+		SCAN
+			INSERT INTO cWiSib (ol_no, sqmt) VALUES (cWiSib0.ol_no, cWiSib0.sqmt)
+		ENDSCAN
+		USE IN cWiSib0
+	ENDIF
+	SELECT cWiSib
+	LOCATE FOR ALLTRIM(ol_no) == tcOlNo
+	IF !FOUND()
+		* the OL itself is not On-Loom / Distri, so it is not part of the Order Form: no split
+		USE IN cWiSib
+		CREATE CURSOR cWiSib (ol_no C(15), sqmt N(8,2), share N(11,3), taken L)
+		INSERT INTO cWiSib (ol_no, sqmt) VALUES (tcOlNo, cWiKey.sqmt)
+	ENDIF
+ENDIF
+USE IN cWiKey
+SET ANSI &lcAnsi
+SELECT cWiSib
+GO TOP
+SELECT (lnSel)
+RETURN RECCOUNT("cWiSib")
+* End of Function WiSiblings
+
+* Edit of a split entry: fill cWiSib with the OLs the entry already has (alias wi_w
+* must be open) plus tcOlNo, the OL now on the edited row.  The Order Form status is
+* NOT looked at again, so an old entry keeps its OLs after the carpets moved on.
+FUNCTION WiMembers
+LPARAMETERS tcGrp, tcOlNo
+LOCAL lnSel, laS[1]
+lnSel = SELECT()
+tcOlNo = ALLTRIM(tcOlNo)
+IF USED("cWiSib")
+	USE IN cWiSib
+ENDIF
+CREATE CURSOR cWiSib (ol_no C(15), sqmt N(8,2), share N(11,3), taken L)
+SELECT DISTINCT w.ol_no, b.sqmt ;
+	FROM wi_w w LEFT JOIN cabuyord b ON b.ol_no = w.ol_no ;
+	WHERE w.grpid = tcGrp ;
+	INTO CURSOR cWiM
+SELECT cWiM
+SCAN
+	INSERT INTO cWiSib (ol_no, sqmt) VALUES (cWiM.ol_no, IIF(ISNULL(cWiM.sqmt), 0, cWiM.sqmt))
+ENDSCAN
+USE IN cWiM
+SELECT cWiSib
+LOCATE FOR ALLTRIM(ol_no) == tcOlNo
+IF !FOUND()
+	SELECT sqmt FROM cabuyord WHERE ol_no = tcOlNo INTO ARRAY laS
+	INSERT INTO cWiSib (ol_no, sqmt) VALUES (tcOlNo, IIF(_TALLY > 0, laS[1], 0))
+ENDIF
+GO TOP
+SELECT (lnSel)
+RETURN RECCOUNT("cWiSib")
+* End of Function WiMembers
+
+
+* Share tnTotal over cWiSib by SqMt (3 decimals).  The rounding difference
+* goes to the OL with the biggest share so that the shares add up exactly.
+PROCEDURE WiSetShares
+LPARAMETERS tnTotal
+LOCAL lnSel, lnSq, lnN, lnSum, lnMax
+lnSel = SELECT()
+SELECT cWiSib
+lnN = RECCOUNT()
+CALCULATE SUM(sqmt) TO lnSq
+SCAN
+	IF lnSq > 0
+		REPLACE share WITH ROUND(tnTotal * sqmt / lnSq, 3), taken WITH .F.
+	ELSE
+		REPLACE share WITH ROUND(tnTotal / lnN, 3), taken WITH .F.
+	ENDIF
+ENDSCAN
+CALCULATE SUM(share) TO lnSum
+IF ROUND(tnTotal - lnSum, 3) # 0
+	CALCULATE MAX(share) TO lnMax
+	LOCATE FOR share = lnMax
+	REPLACE share WITH ROUND(share + (tnTotal - lnSum), 3)
+ENDIF
+SELECT (lnSel)
+RETURN
+* End of Procedure WiSetShares
+
+
+* A GRPID not used by any Wiissue row yet (alias wi_w must be open)
+FUNCTION WiNewGrpId
+LOCAL lcId, laCnt[1]
+DO WHILE .T.
+	lcId = SUBSTR(DTOS(DATE()), 3) + STRTRAN(TIME(), ":", "") + PADL(INT(RAND() * 1000), 3, "0")
+	SELECT COUNT(*) FROM wi_w WHERE grpid = lcId INTO ARRAY laCnt
+	IF laCnt[1] = 0
+		EXIT
+	ENDIF
+ENDDO
+RETURN lcId
+* End of Function WiNewGrpId
+
+
+* Count / total quantity / printed slips of the rows of one entry.
+* Returns the number of rows; tnTotal, tnPrinted are passed by reference.
+FUNCTION WiGroupInfo
+LPARAMETERS tcGrp, tnTotal, tnPrinted
+LOCAL lnSel, laInf[3], lnN
+lnSel = SELECT()
+tnTotal = 0
+tnPrinted = 0
+lnN = 0
+IF !EMPTY(tcGrp) .AND. WiOpenW()
+	SELECT COUNT(*), SUM(quantity), SUM(IIF(EMPTY(slipno), 0, 1)) ;
+		FROM wi_w WHERE grpid = tcGrp INTO ARRAY laInf
+	lnN = laInf[1]
+	tnTotal = IIF(lnN > 0, laInf[2], 0)
+	tnPrinted = IIF(lnN > 0, laInf[3], 0)
+	USE IN wi_w
+ENDIF
+SELECT (lnSel)
+RETURN lnN
+* End of Function WiGroupInfo
+
+
+* Position of field tcField in alias wi_w (for the row arrays below)
+FUNCTION WiFno
+LPARAMETERS tcField
+LOCAL laF[1], lni
+=AFIELDS(laF, "wi_w")
+FOR lni = 1 TO ALEN(laF, 1)
+	IF laF[lni, 1] == UPPER(tcField)
+		RETURN lni
+	ENDIF
+ENDFOR
+RETURN 0
+* End of Function WiFno
+
+
+* Write the rows of one entry: update the rows already in the group, delete the
+* ones whose OL left the entry, insert the missing ones.  The lead row (record
+* tnRec, already saved) supplies party, bill, date, quality, colour ...
+* cWiSib must hold the shares (WiSiblings / WiMembers + WiSetShares).
+* All or nothing (one transaction).
+FUNCTION WiSyncGroup
+LPARAMETERS tcGrp, tnRec
+LOCAL lnSel, laRow[1], lnOl, lnQty, lnAmt, lnGrp, lnRate, lcOldErr, llOk
+PRIVATE pcWiErr
+lnSel = SELECT()
+IF EMPTY(tcGrp) .OR. !WiOpenW()
+	SELECT (lnSel)
+	RETURN .F.
+ENDIF
+lnOl = WiFno("OL_NO")
+lnQty = WiFno("QUANTITY")
+lnAmt = WiFno("AMT")
+lnGrp = WiFno("GRPID")
+lnRate = WiFno("RATE")
+pcWiErr = ""
+lcOldErr = ON("ERROR")
+ON ERROR pcWiErr = MESSAGE()
+BEGIN TRANSACTION
+SELECT wi_w
+GO tnRec
+SCATTER TO laRow
+REPLACE grpid WITH tcGrp IN wi_w
+laRow[lnGrp] = tcGrp
+SCAN FOR EMPTY(pcWiErr) .AND. grpid = tcGrp
+	SELECT cWiSib
+	LOCATE FOR ALLTRIM(ol_no) == ALLTRIM(wi_w.ol_no) .AND. !taken .AND. share > 0
+	IF FOUND()
+		REPLACE taken WITH .T.
+		laRow[lnOl] = cWiSib.ol_no
+		laRow[lnQty] = cWiSib.share
+		laRow[lnAmt] = ROUND(laRow[lnRate] * cWiSib.share, 2)
+		SELECT wi_w
+		GATHER FROM laRow
+	ELSE
+		SELECT wi_w
+		DELETE
+	ENDIF
+	SELECT wi_w
+ENDSCAN
+SELECT cWiSib
+SCAN FOR EMPTY(pcWiErr) .AND. !taken .AND. share > 0
+	laRow[lnOl] = cWiSib.ol_no
+	laRow[lnQty] = cWiSib.share
+	laRow[lnAmt] = ROUND(laRow[lnRate] * cWiSib.share, 2)
+	SELECT wi_w
+	INSERT INTO wi_w FROM ARRAY laRow
+	SELECT cWiSib
+ENDSCAN
+IF EMPTY(pcWiErr)
+	END TRANSACTION
+	llOk = .T.
+ELSE
+	ROLLBACK
+	llOk = .F.
+ENDIF
+ON ERROR &lcOldErr
+USE IN wi_w
+IF !llOk
+	=MESSAGEBOX("Could not split the issue over the OLs:" + CHR(13) + pcWiErr + CHR(13) + ;
+		"The row was saved as entered (full quantity on one OL).", 48, "Split by SqMt")
+ENDIF
+SELECT (lnSel)
+RETURN llOk
+* End of Function WiSyncGroup
+
+
+* Call just BEFORE the current Wiissue row is saved; hand the result to WiPostSave.
+*   Add  : the new (buffered) row gets a unique marker in GRPID.  After the save it
+*          is found again on disk by that marker - the record pointer of the form
+*          can sit on ANOTHER row of the same OL after a TABLEUPDATE, so RECNO()
+*          cannot be trusted then.
+*   Edit : the record number of the row being edited (it exists already).
+FUNCTION WiPreSave
+LPARAMETERS tlAdd
+LOCAL lcMark
+IF TYPE("wiissue.grpid") = "U"
+	RETURN ""
+ENDIF
+IF !tlAdd
+	RETURN ALLTRIM(STR(RECNO("wiissue")))
+ENDIF
+lcMark = "~" + SYS(2015) + PADL(INT(RAND() * 10000), 4, "0")
+REPLACE grpid WITH lcMark IN wiissue
+RETURN lcMark
+* End of Function WiPreSave
+
+
+* After an Add / Edit row has been saved (tcTok = result of WiPreSave).
+*   tlAdd .T.  new row: split it if its OL has Order Form partners, else just
+*              take the marker off
+*   tlAdd .F.  edited row of a split entry: share the (new) quantity again over
+*              the OLs the entry already has
+PROCEDURE WiPostSave
+LPARAMETERS tlAdd, tcTok
+LOCAL lnSel, lnRec, lcOl, lnQty, lcGrp, lnN, llSplit, laPrn[1]
+lnSel = SELECT()
+IF EMPTY(tcTok) .OR. TYPE("wiissue.grpid") = "U"
+	IF tlAdd .AND. TYPE("wiissue.grpid") = "U"
+		=MESSAGEBOX("Split by SqMt is not active: Wiissue has no GRPID column." + CHR(13) + ;
+			"Run  DO wiissue_addgrp  once (all users out of the program).", 48, "Split by SqMt")
+	ENDIF
+	SELECT (lnSel)
+	RETURN
+ENDIF
+IF !WiOpenW()
+	SELECT (lnSel)
+	RETURN
+ENDIF
+SELECT wi_w
+lnRec = 0
+IF tlAdd
+	LOCATE FOR grpid = tcTok
+	IF FOUND()
+		lnRec = RECNO()
+	ENDIF
+ELSE
+	lnRec = VAL(tcTok)
+	IF lnRec < 1 .OR. lnRec > RECCOUNT()
+		lnRec = 0
+	ENDIF
+ENDIF
+IF lnRec = 0
+	USE IN wi_w
+	SELECT (lnSel)
+	RETURN
+ENDIF
+GO lnRec
+lcOl = ALLTRIM(ol_no)
+lnQty = quantity
+lcGrp = IIF(tlAdd, "", ALLTRIM(grpid))
+llSplit = .T.
+DO CASE
+CASE DELETED() .OR. EMPTY(lcOl) .OR. lnQty <= 0 .OR. (!tlAdd .AND. EMPTY(lcGrp))
+	llSplit = .F.
+CASE tlAdd
+	lnN = WiSiblings(lcOl)
+	IF lnN <= 1
+		llSplit = .F.
+	ELSE
+		lcGrp = WiNewGrpId()
+	ENDIF
+OTHERWISE
+	SELECT SUM(IIF(EMPTY(slipno), 0, 1)) FROM wi_w WHERE grpid = lcGrp INTO ARRAY laPrn
+	IF laPrn[1] > 0
+		* a bill/slip of this entry is already printed: do not touch the other rows
+		=MESSAGEBOX("The slip of this split issue is already printed: only the edited row was changed." + CHR(13) + ;
+			"The other OL rows were NOT re-split.", 48, "Split by SqMt")
+		llSplit = .F.
+	ELSE
+		lnN = WiMembers(lcGrp, lcOl)
+	ENDIF
+ENDCASE
+IF tlAdd .AND. !llSplit
+	REPLACE grpid WITH "" IN wi_w
+ENDIF
+USE IN wi_w
+IF llSplit
+	=WiSetShares(lnQty)
+	IF WiSyncGroup(lcGrp, lnRec)
+		WAIT WINDOW TRANSFORM(lnQty, "999,999.999") + " kg split by SqMt over " + ;
+			ALLTRIM(STR(lnN)) + " OL of the Order Form" NOWAIT
+	ELSE
+		IF tlAdd .AND. WiOpenW()
+			SELECT wi_w
+			GO lnRec
+			REPLACE grpid WITH "" IN wi_w
+			USE IN wi_w
+		ENDIF
+	ENDIF
+ENDIF
+IF USED("cWiSib")
+	USE IN cWiSib
+ENDIF
+* show the saved row, re-read from disk (its share, no marker)
+IF USED("wiissue") .AND. lnRec <= RECCOUNT("wiissue")
+	GO lnRec IN wiissue
+ENDIF
+SELECT (lnSel)
+RETURN
+* End of Procedure WiPostSave
+
+
+* Delete ALL rows of the split entry tcGrp (after asking).
+* Returns  1 = whole entry deleted,  0 = cancelled / not possible,
+*        -1 = entry has only this one row left (do the normal delete).
+FUNCTION WiDeleteGroup
+LPARAMETERS tcGrp
+LOCAL lnN, lnTot, lnPrn
+lnN = WiGroupInfo(tcGrp, @lnTot, @lnPrn)
+IF lnN <= 1
+	* nothing but this row: let the normal delete do it
+	RETURN -1
+ENDIF
+IF lnPrn > 0
+	=MESSAGEBOX("Cannot delete: the bill/slip of this split issue is already printed.", 48, "Split by SqMt")
+	RETURN 0
+ENDIF
+IF MESSAGEBOX("This row belongs to ONE issue of " + TRANSFORM(lnTot, "999,999.999") + " kg split over " + ;
+		ALLTRIM(STR(lnN)) + " OL rows." + CHR(13) + "Delete the WHOLE issue (all " + ALLTRIM(STR(lnN)) + " rows)?", ;
+		36, "Split by SqMt") # 6
+	RETURN 0
+ENDIF
+RETURN IIF(WiDelGrpRows(tcGrp), 1, 0)
+* End of Function WiDeleteGroup
+
+
+* Delete every row of the entry tcGrp in one transaction.  .T. = done.
+FUNCTION WiDelGrpRows
+LPARAMETERS tcGrp
+LOCAL lcOldErr, llOk
+PRIVATE pcWiErr
+IF EMPTY(tcGrp) .OR. !WiOpenW()
+	RETURN .F.
+ENDIF
+pcWiErr = ""
+lcOldErr = ON("ERROR")
+ON ERROR pcWiErr = MESSAGE()
+BEGIN TRANSACTION
+DELETE FROM wi_w WHERE grpid = tcGrp
+IF EMPTY(pcWiErr)
+	END TRANSACTION
+	llOk = .T.
+ELSE
+	ROLLBACK
+	llOk = .F.
+ENDIF
+ON ERROR &lcOldErr
+USE IN wi_w
+IF !llOk
+	=MESSAGEBOX("Could not delete the issue:" + CHR(13) + pcWiErr, 48, "Split by SqMt")
+ENDIF
+RETURN llOk
+
+
+* End of SPLIT ISSUE BY SQMT
