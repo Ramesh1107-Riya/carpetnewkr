@@ -1,0 +1,1 @@
+select code,count(code) from buyrate group by code

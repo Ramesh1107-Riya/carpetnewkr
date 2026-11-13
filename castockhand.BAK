@@ -1,0 +1,125 @@
+* Carpet Stock in hand, do not include exported
+SET DELETED ON
+SET PROCEDURE TO Catool
+Set safe off
+Set Date to Briti
+Set Century on
+SET ANSI ON
+
+*Here srate is costrate
+CREATE CURSOR REPSTOCK(OL_NO C(15),QUALITY C(12),COLOUR C(10),YTYPE C(6),BALQTY N(11,3),SRATE N(8,2),AMT N(12,2),COTKG N(11,3),SILKKG N(11,3), YARNKG N(11,3))
+
+SELECT  YTYPE,OL_NO,SUM(QUANTITY) AS QUANTITY,QUALITY,COLOUR,RATE;									
+FROM WIISSUE;										
+GROUP BY ol_no,quality,colour; 										
+ORDER BY ol_no;										
+INTO CURSOR wiis										
+										
+SELECT  YTYPE, OL_NO,SUM(QUANTITY) AS QUANTITY,QUALITY,COLOUR;									
+FROM WIRETURN;										
+GROUP BY ol_no,quality,colour; 										
+ORDER BY ol_no;										
+INTO CURSOR wiRet										
+										
+Select i.ytype, i.ol_no,i.quality,i.colour,i.quantity-iif(r.quantity>0,r.quantity,0.000) as balqty,j.srate,(i.quantity-iif(r.quantity>0,r.quantity,0.000))*j.srate  as Amt;										
+FROM wiis i;
+LEFT OUTER JOIN wiRet r;										
+ON i.ol_no=r.ol_no .and. i.quality=r.quality .and. i.colour=r.colour;
+Join wiqlty j;
+On j.quality=i.quality;										
+ORDER BY i.ol_no,i.quality,i.colour;										
+INTO CURSOR wiisRetA
+
+
+Select ytype,ol_no,Quality,Colour,srate,iif(balqty>0,balqty,0.000) as Balqty,iif(Amt>0,Amt,0.00) as Amt;										
+FROM wiisRetA;										
+ORDER BY ol_no,Quality,Colour;										
+INTO CURSOR yir
+
+***** distribute all data according issue/retun
+SELECT yir
+DO WHILE .NOT. EOF()
+SELECT REPSTOCK
+APPEN BLANK
+repl ytype with yir->ytype,ol_no with yir->ol_no,quality with yir->quality,colour with yir->colour,amt with yir->amt,srate with yir->srate
+do case
+	case  YTYPE='COTTON'
+		repl repstock->COTKG with yir->Balqty		
+	case  YTYPE='YARN'
+		repl repstock->YARNKG with yir->Balqty	
+	case  YTYPE='SILK'
+		repl repstock->SILKKG with yir->Balqty	
+endcase
+   SELECT yir
+	IF .NOT. EOF()
+	   SKIP
+	ENDIF
+ENDDO
+
+Select ol_No,sum(YarnKg) YarnKg,sum(SilkKg) SilkKg, sum(CotKg) CotKg, sum(CotKg)+Sum(SilkKg)+Sum(YarnKg) As TotalKg, sum(Amt) yrnAmt;
+From Repstock;
+Group by ol_No;
+Order by ol_No;
+Into Cursor Repstock1
+
+SELECT b.BCODE, b.QUALITY, s.CARD_NO, s.WEAVER, s.CARPETNO,  b.DESIGN, b.COLOUR, b.SZCODE, s.BTHWEAV,s.LTHWEAV, s.FINSQMT, b.OL_NO, s.ISSDT, s.GRADE, s.FDate, b.PO_NO,;
+b.NOTES,s.rate,s.amt,s.Penalamt,s.extramt,s.BILLNO,b.ORDER_TYPE, b.SPCL_INST, b.cstatus,b.sqmt;
+FROM Cabuyord b, Casupord s;
+WHERE b.OL_NO=s.OL_NO .AND. !EMPTY(s.FDATE) .AND. s.FDATE>=m.Text1 .and. s.FDATE<=m.Text2 .AND. b.EXPORTED <> .T. ;
+INTO CURSOR TEMP1
+*b.Displayrep=.T.
+select temp1
+brow
+
+SELECT BCODE, QUALITY, WEAVER, CARPETNO,  DESIGN, COLOUR, SZCODE, BTHWEAV,LTHWEAV, FINSQMT, OL_NO, ISSDT, GRADE, FDate, PO_NO,;
+NOTES,rate as CaRate,amt  as CaAmt,Penalamt,extramt,amt+extramt as CaTAmt,BILLNO,ORDER_TYPE, SPCL_INST,cstatus,sqmt ;
+FROM TEMP1;	
+WHERE ccsMatch10a(Bcode, Quality, Weaver, Grade, Po_no, Notes, BillNo, Carpetno, Order_Type, Spcl_Inst);	
+ORDER BY Weaver,FDate ASC;
+INTO CURSOR wocost	
+									
+*) Combine both Weaving cost + Ovhead cost with Yarn cost, Cost of our production													
+Select b.BCODE, b.QUALITY, b.WEAVER, b.CARPETNO, b.DESIGN, b.COLOUR, b.SZCODE, b.BTHWEAV, b.LTHWEAV, b.FINSQMT, b.OL_NO, b.ISSDT, b.GRADE, b.FDate, b.PO_NO,;
+b.NOTES, b.CaRate, b.CaAmt, b.Extramt, b.CaAmt+b.Extramt as CaTAmt, b.BILLNO, b.ORDER_TYPE, b.SPCL_INST, b.cstatus, b.sqmt, r.YarnKg, r.SilkKg, r.CotKg, r.TotalKg,r.yrnAmt;				
+FROM wocost b;									
+Left Join Repstock1 r;									
+ON b.ol_no=r.ol_no;									
+ORDER BY b.ol_no;									
+INTO CURSOR Cost1	
+	
+Select BCODE, QUALITY, WEAVER, CARPETNO,  DESIGN, COLOUR, SZCODE, BTHWEAV,LTHWEAV, FINSQMT, OL_NO, ISSDT, GRADE, FDate, PO_NO,NOTES, CaRate, CaAmt,;
+Extramt,CaTAmt, BILLNO, ORDER_TYPE, SPCL_INST, cstatus, sqmt, YarnKg, SilkKg, CotKg, iif(TotalKg>0,TotalKg,4*finsqmt) as Totalkg,;
+iif(yrnAmt>0,yrnAmt,4*Finsqmt*1000) as yrnAmt;			
+From Cost1;
+Order by bcode,ol_no;
+INTO CURSOR temprepview
+
+*Ajusting Null sample with avg consumption yarn 4kg per sqmt and yarn cost Rs.1000 per kg
+*iif(r.TotalKg>0,r.TotalKg,4*b.finsqmt)* iif(yrnAmt>0,yrnAmt,4*Finsqmt*1000) as yrnAmt;
+	
+***Date Min and Max for Bill Made
+Private m.StartDt,m.EndDt
+Select Min(Fdate) as Min_Date from  temprepview into cursor mindate
+select mindate
+m.StartDt=mindate->Min_Date
+Select max(Fdate) as Max_Date from  temprepview into cursor maxdate 
+select maxdate
+m.EndDt=maxdate->Max_Date
+*********************************************
+
+Select temprepview
+SET COLOR TO
+If RECNO()>RECCOUNT()
+	Messagebox("Record Not Found for the above seletion!!!")
+Else
+Do Case
+	Case m.PrnStat="V"
+		Report form castockhand.frx PREVIEW WINDOW wReport 
+		DEACTIVATE WINDOW wReport
+	Case m.PrnStat="P"
+		Report form castockhand.frx to printer prompt noconsole
+Endcase
+Endif
+Return
+
+

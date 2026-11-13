@@ -1,0 +1,44 @@
+SET DELETED ON
+SET TALK OFF
+SET SAFE OFF
+
+CREATE CURSOR PARTYLEDG (QUALITY C(8),COLOUR C(10),DATE D(8),ISSQTY N(11,3),RETNQTY N(11,3),BILLNO C(6),;
+PARTY C(15),COMMENT C(30))
+
+SELECT QUALITY,COLOUR,DATE,(QUANTITY) ISSQTY,BILLNO,PARTY,COMMENT;
+FROM WIISSUE;
+WHERE Party=m.Party .and. date=>m.startdt .and. date=<m.enddt;
+ORDER BY DATE;
+INTO CURSOR ISS2
+
+SELECT QUALITY,COLOUR,DATE,(QUANTITY) RETNQTY,BILLNO,PARTY,COMMENT;
+FROM Carpet!WIRETURN;
+WHERE Party=m.Party .and. date=>m.startdt .and. date=<m.enddt;
+ORDER BY DATE;
+INTO CURSOR RETN
+
+SELECT PARTYLEDG
+APPEND FROM DBF('ISS2')
+APPEND FROM DBF('RETN')
+
+
+SELECT *;
+FROM PARTYLEDG;
+ORDER BY Quality,DATE ASC,COLOUR DESC;
+INTO CURSOR PARTYLEDG1
+
+If RECNO()>RECCOUNT()
+	Messagebox("Record Not Found for the above seletion!!!")
+Else
+SET COLOR TO
+Do Case
+	Case m.PrnStat="V"
+		Report form wipartyledg.frx PREVIEW WINDOW wReport 
+		DEACTIVATE WINDOW wReport	
+	Case m.PrnStat="P"
+		Report form wipartyledg.frx to printer prompt noconsole
+Endcase
+Endif
+RETURN
+
+

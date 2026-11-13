@@ -1,0 +1,253 @@
+*******White Yarn Stock - White Yarn Stock Detail and Summary Report
+SET DELETED ON
+SET TALK OFF
+SET SAFE OFF
+
+Procedure Querygen
+Open database carpet share
+CREATE CURSOR REPSTOCKY (QUALITY C(8), LOCATION C(10), NETWT N(12,3), INQTY N(12,3), ORDQTY N(12,3), RECQTY N(12,3), ISSQTY N(12,3),;
+                         INQTYM N(12,3), ORDQTYM N(12,3), RECQTYM N(12,3), ISSQTYM N(12,3))
+
+SELECT REPSTOCKY
+APPEND FIELDS QUALITY,NETWT,LOCATION FROM YRNOP
+RETURN
+
+*******Calculate total till date
+SELECT QUALITY, SUM(NETWT) NETWT;
+FROM Carpet!YRRECP SHARE;  && Inter yarn received for wool given
+WHERE date<=medate;
+GROUP BY QUALITY;
+ORDER BY QUALITY;
+INTO CURSOR YRR
+
+
+SELECT QUALITY, SUM(NETWT) NETWT;
+FROM YRNORDER SHARE;
+WHERE date<=medate;
+GROUP BY QUALITY;
+ORDER BY QUALITY;
+INTO CURSOR YRO
+
+
+SELECT QUALITY, SUM(NETWT) NETWT;
+FROM YRNRECVD SHARE;
+WHERE recdt<=medate;
+GROUP BY QUALITY;
+ORDER BY QUALITY;
+INTO CURSOR YRD
+
+
+SELECT QUALITY, SUM(QUANTITY) NETWT;
+FROM YRISSDY SHARE;
+WHERE date<=medate;
+GROUP BY QUALITY;
+ORDER BY QUALITY;
+INTO CURSOR YRI
+
+***CALCULATE MONTH TOTAL
+SELECT QUALITY, SUM(NETWT) NETWT;
+FROM YRRECP SHARE;
+WHERE date>=msdate .and. date<=medate;
+GROUP BY QUALITY;
+ORDER BY QUALITY;
+INTO CURSOR YRRM
+
+SELECT QUALITY, SUM(NETWT) NETWT;
+FROM YRNORDER SHARE;
+WHERE date>=msdate .and. date<=medate;
+GROUP BY QUALITY;
+ORDER BY QUALITY;
+INTO CURSOR YROM
+
+SELECT QUALITY, SUM(NETWT) NETWT;
+FROM YRNRECVD SHARE;
+WHERE date>=msdate .and. date<=medate;
+GROUP BY QUALITY;
+ORDER BY QUALITY;
+INTO CURSOR YRDM
+
+SELECT QUALITY, SUM(NETWT) NETWT;
+FROM YRISSDYE SHARE;
+WHERE date>=msdate .and. date<=medate;
+GROUP BY QUALITY;
+ORDER BY QUALITY;
+INTO CURSOR YRIM
+*---------------
+*------Index each of above file to pickup same quality
+SELECT REPSTOCKY
+INDEX ON QUALITY TAG YRNOP
+set order to YRNOP
+
+SELECT YRR
+INDEX ON QUALITY TAG YRRN
+SET ORDER TO YRRN
+SELECT YRO
+INDEX ON QUALITY TAG YRON
+SET ORDER TO YRON
+SELECT YRD
+INDEX ON QUALITY TAG YRDN
+SET ORDER TO YRDN
+SELECT YRI
+INDEX ON QUALITY TAG YRIN
+SET ORDER TO YRIN
+
+SELECT YRRM
+INDEX ON QUALITY TAG YRRNM
+SET ORDER TO YRRNM
+SELECT YROM
+INDEX ON QUALITY TAG YRONM
+SET ORDER TO YRONM
+SELECT YRDM
+INDEX ON QUALITY TAG YRDNM
+SET ORDER TO YRDNM
+SELECT YRIM
+INDEX ON QUALITY TAG YRINM
+SET ORDER TO YRINM
+
+
+**In the same date all the data is scanned individually
+SELECT REPSTOCK
+  GO TOP
+DO WHILE .NOT. EOF()
+  	=SEEK (REPSTOCKY.QUALITY,"YRR")  && search repstock field same as in Wool Purchase, field must exactly match
+  	IF .T.
+    	REPL REPSTOCKY.INQTY WITH YRR.NETWT
+    ENDIF
+
+    =SEEK (REPSTOCKY.QUALITY,"YRO")
+  	IF .T.
+    	REPL REPSTOCKY.ORDQTY WITH YRO.NETWT
+    ENDIF  
+ 
+   	=SEEK (REPSTOCKY.QUALITY,"YRD")
+  	IF .T.
+    	REPL REPSTOCKY.RECQTY WITH YRD.NETWT
+    ENDIF
+ 
+    =SEEK (REPSTOCKY.QUALITY,"YRI")
+  	IF .T.
+    	REPL REPSTOCKY.ISSQTY WITH YRI.NETWT
+    ENDIF  
+    
+   ***Search for Monthly 
+    =SEEK (REPSTOCKY.QUALITY,"YRRM")  
+  	IF .T.
+    	REPL REPSTOCKY.INQTYM WITH YRRM.NETWT
+    ENDIF
+
+    =SEEK (REPSTOCKY.QUALITY,"YROM")
+  	IF .T.
+    	REPL REPSTOCKY.ORDQTYM WITH YROM.NETWT
+    ENDIF  
+ 
+   	=SEEK (REPSTOCKY.QUALITY,"YRDM")
+  	IF .T.
+    	REPL REPSTOCKY.RECQTYM WITH YRDM.NETWT
+    ENDIF
+ 
+    =SEEK (REPSTOCKY.QUALITY,"YRIM")
+  	IF .T.
+    	REPL REPSTOCKY.ISSQTYM WITH YRIM.NETWT
+    ENDIF  
+    
+   SELECT REPSTOCKY
+	IF .NOT. EOF()
+	   SKIP
+	ENDIF
+ENDDO
+RETURN
+**END OF Querygen
+
+****all Quality (Detail Rep,Summary), One Quality (Detail Rep), -ve,+ve all stock report
+Procedure Detailrep
+Do Case
+  Case !Empty(m.QUALITY) .and. m.chk1=0 .and. m.chk2=0 
+	SELECT * ;
+	FROM REPSTOCKY;
+	WHERE NETWT>0 .OR. RECQTY>0 .OR. ISSQTY>0 .OR. RECQTYM>0 .OR. ISSQTYM>0 .OR. INQTY>0 .OR. INQTYM>0;
+	HAVING QUALITY=m.QUALITY;
+	ORDER BY QUALITY;
+	INTO CURSOR REP3
+
+  Case Empty(m.QUALITY) .and. m.chk1=0 .and. m.chk2=0 
+	SELECT * ;
+	FROM REPSTOCKY;
+	WHERE NETWT>0 .OR. RECQTY>0 .OR. ISSQTY>0 .OR. RECQTYM>0 .OR. ISSQTYM>0 .OR. INQTY>0 .OR. INQTYM>0;
+	ORDER BY QUALITY;
+	INTO CURSOR REP3
+Endcase  
+
+If RECNO()>RECCOUNT()
+	Messagebox("Record Not Found for the above seletion!!!")
+Else
+SET COLOR TO
+Do Case
+	Case m.PrnStat="V"
+		Report form yarnstk.frx to console preview in screen
+	Case m.PrnStat="P"
+		Report form yarnstk.frx to printer prompt noconsole
+Endcase
+Endif
+RETURN
+
+
+****Only -ve Stock Balance, all Quality (Detail Rep,Summary), Quality (Detail Rep)
+Procedure Detailrep1
+Do Case
+  Case !Empty(m.QUALITY) .and. m.chk1=0 .and. m.chk2=1
+	SELECT * ;
+	FROM REPSTOCKY;
+	WHERE NETWT+RECQTY+RECQTYM+INQTY-ISSQTY-ISSQTYM<0 ;
+	HAVING QUALITY=m.QUALITY;
+	ORDER BY QUALITY;
+	INTO CURSOR REP3
+
+Case Empty(m.QUALITY) .and. m.chk1=0 .and. m.chk2=1
+	SELECT * ;
+	FROM REPSTOCKY;
+	WHERE NETWT+RECQTY+RECQTYM+INQTY-ISSQTY-ISSQTYM<0 ;
+	HAVING QUALITY=m.QUALITY;
+	ORDER BY QUALITY;
+	INTO CURSOR REP3
+Endcase  
+
+If RECNO()>RECCOUNT()
+	Messagebox("Record Not Found for the above seletion!!!")
+Else
+SET COLOR TO
+Do Case
+	Case m.PrnStat="V"
+		Report form yarnstk.frx to console preview in screen
+	Case m.PrnStat="P"
+		Report form yarnstk.frx to printer prompt noconsole
+Endcase
+Endif
+RETURN
+
+*All customer & All Quality
+Procedure StockSumary
+SET COLOR TO
+Do case
+  Case m.chk1=1 .AND. m.chk2=0
+	SELECT QUALITY,LOCATION, SUM(NETWT) NETWT, SUM(INQTY) INQTY, SUM(ORDQTY) ORDQTY, SUM(RECQTY) RECQTY, SUM(ISSQTY) ISSQTY,;
+								SUM(INQTYM) INQTYM, SUM(ORDQTYM) ORDQTYM, SUM(RECQTYM) RECQTYM,SUM(ISSQTYM) ISSQTYM;
+	FROM REPSTOCKY;
+	WHERE NETWT>0 .OR. RECQTY>0 .OR. ISSQTY>0 .OR. RECQTYM>0 .OR. ISSQTYM>0 .OR. INQTY>0 .OR. INQTYM>0;
+	GROUP BY QUALITY;
+	ORDER BY QUALITY;
+	INTO CURSOR REP4
+ Endcase
+If RECNO()>RECCOUNT()
+	Messagebox("Record Not Found for the above seletion!!!")
+Else
+SET COLOR TO
+Do Case
+	Case m.PrnStat="V"
+		Report form yarnstksum.frx to console preview in screen
+	Case m.PrnStat="P"
+		Report form yarnstksum.frx to printer prompt noconsole
+Endcase
+Endif
+RETURN
+
+

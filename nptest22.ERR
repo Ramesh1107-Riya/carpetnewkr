@@ -1,0 +1,1 @@
+WHERE Invno = m.invno ORDER BY p.Quality Into Cursor temp1Error in line 14: Unrecognized command verb.

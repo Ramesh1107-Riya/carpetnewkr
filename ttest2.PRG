@@ -1,0 +1,19 @@
+SELECT b.BCODE, b.PO_NO, b.CTRL_NO, b.OL_NO, b.QUALITY, b.DESIGN, b.SZCODE, b.COLOUR, b.SPCL_INST, b.CSTATUS, b.NOTES, b.SQMT, b.PO_DT, b.DELIRY_DT, b.SKUNO,;
+ 		s.CARPETNO, s.SUPPLIER, s.CUTDATE, s.ISSDT, s.WEV_LAST_DT, s.WEV_CM, s.WEV_CMDT,s.FDATE,s.ISSDTWASH, s.RCDDTWASH;
+FROM  Cabuyord b;
+LEFT OUTER JOIN Casupord s;
+ON b.OL_NO=s.OL_NO;
+WHERE b.cstatus<>"Exported";
+Into Cursor temp7
+select temp7
+brow
+	
+SELECT b.BCODE, b.PO_NO, b.CTRL_NO, b.OL_NO, b.QUALITY, b.DESIGN, b.SZCODE, b.COLOUR, b.SPCL_INST, b.CSTATUS, b.NOTES, b.SQMT, b.PO_DT, b.DELIRY_DT, b.SKUNO,;
+ 		s.CARPETNO, s.SUPPLIER, s.CUTDATE, s.ISSDT, s.WEV_LAST_DT, s.WEV_CM, s.WEV_CMDT,s.FDATE,s.ISSDTWASH, s.RCDDTWASH;
+FROM  Cabuyord b;
+LEFT OUTER JOIN Casupord s;
+ON b.OL_NO=s.OL_NO;
+Into Cursor temp7
+select temp7
+brow
+	

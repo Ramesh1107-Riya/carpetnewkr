@@ -1,0 +1,1 @@
+Select Design,Colour,Code,Addusd,Silkper From Cadgnsilkpr where silkper>0

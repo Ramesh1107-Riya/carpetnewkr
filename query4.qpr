@@ -1,0 +1,7 @@
+SELECT Cabuyord.ol_no, Cabuyord.design, Cabuyord.quality,;
+  Cabuyord.colour, Cabuyord.szcode, Cabuyord.cstatus, Casupord.ol_no,;
+  Casupord.weaver, Casupord.supplier, Casupord.category, Casupord.loomdt,;
+  Casupord.carpetno, Casupord.bthweav, Casupord.lthweav, Casupord.finsqmt,;
+  Casupord.fdate, Casupord.grade, Casupord.carpetwt, Casupord.sclue;
+ FROM  carpet!cabuyord INNER JOIN carpet!casupord ;
+   ON  Cabuyord.ol_no = Casupord.ol_no

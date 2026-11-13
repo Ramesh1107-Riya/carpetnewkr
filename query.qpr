@@ -1,0 +1,7 @@
+SELECT Cadesign.code, Cadesign.quality, Cadesign.fldtype,;
+  Cafield.fieldcode, Cafield.quality, Cafield.fldtype, Cafield.grate_a,;
+  Cafield.grate_b, Cafield.grate_c, Cafield.grate_d;
+ FROM  carpet!cadesign INNER JOIN carpet!cafield;
+    INNER JOIN carpet!cadesign ;
+   ON  Cadesign.fldtype = Cafield.fldtype ;
+   ON  Cadesign.quality = Cafield.quality
