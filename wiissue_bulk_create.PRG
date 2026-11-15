@@ -50,7 +50,23 @@ IF llOk
 				"It was not changed.  Copy the records out, delete them, and run this again.", 16, "Wiissue_bulk")
 		ENDCASE
 	ELSE
-		llMake = .T.
+		* a wiissue_bulk.dbf left on disk that the database does not list: erase it if empty
+		lnRecs = OrphanRecs("wiissue_bulk.dbf")
+		DO CASE
+		CASE lnRecs < 0
+			llMake = .T.
+		CASE lnRecs = 0
+			ERASE wiissue_bulk.dbf
+			ERASE wiissue_bulk.cdx
+			ERASE wiissue_bulk.fpt
+			llMake = !FILE("wiissue_bulk.dbf")
+			IF !llMake
+				=MESSAGEBOX("Cannot erase the old empty wiissue_bulk.dbf (in use?).", 16, "Wiissue_bulk")
+			ENDIF
+		OTHERWISE
+			=MESSAGEBOX("wiissue_bulk.dbf is on disk with " + ALLTRIM(STR(lnRecs)) + " records but is not in the database." + CHR(13) + ;
+				"It was not changed.  Rename or move it, and run this again.", 16, "Wiissue_bulk")
+		ENDCASE
 	ENDIF
 ENDIF
 IF llMake
@@ -77,3 +93,19 @@ CLOSE DATABASES
 SET EXCLUSIVE &lcExcl
 SET SAFETY &lcSafety
 RETURN
+
+* record count of a DBF file read from its header (-1 = no such file)
+FUNCTION OrphanRecs
+LPARAMETERS tcFile
+LOCAL lnH, lcHdr
+IF !FILE(tcFile)
+	RETURN -1
+ENDIF
+lnH = FOPEN(tcFile)
+IF lnH < 0
+	RETURN 1
+ENDIF
+lcHdr = FREAD(lnH, 8)
+=FCLOSE(lnH)
+RETURN ASC(SUBSTR(lcHdr, 5, 1)) + 256 * ASC(SUBSTR(lcHdr, 6, 1)) + 65536 * ASC(SUBSTR(lcHdr, 7, 1)) + 16777216 * ASC(SUBSTR(lcHdr, 8, 1))
+ENDFUNC
