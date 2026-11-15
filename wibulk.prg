@@ -41,6 +41,9 @@ DEFINE CLASS wbText AS TextBox
 	PROCEDURE LostFocus
 		THISFORM.CtlLost(THIS.Name)
 	ENDPROC
+	PROCEDURE InteractiveChange
+		THISFORM.CtlChange(THIS.Name)
+	ENDPROC
 ENDDEFINE
 
 DEFINE CLASS wbBtn AS CommandButton
@@ -333,6 +336,22 @@ DEFINE CLASS frmWiBulk AS Form
 	CASE tcName == "txtQty"
 		THIS.Recalc()
 	ENDCASE
+	ENDPROC
+
+	* while typing the GRPID: fill supplier / design / order date / OLs as soon as the
+	* number typed so far is a GRPID (no message for a partly typed number)
+	PROCEDURE CtlChange
+	LPARAMETERS tcName
+	LOCAL laC[1]
+	IF !(THIS.cMode $ "AE") .OR. !(tcName == "txtGrp")
+		RETURN
+	ENDIF
+	IF THIS.txtGrp.Value > 0
+		SELECT COUNT(*) FROM casupord WHERE grpid = THIS.txtGrp.Value INTO ARRAY laC
+		IF _TALLY > 0 .AND. laC[1] > 0
+			THIS.Recalc()
+		ENDIF
+	ENDIF
 	ENDPROC
 
 	*-----------------------------------------------------------------
