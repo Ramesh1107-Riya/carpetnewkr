@@ -17,9 +17,20 @@
 * Needs (once):  DO wiissue_addgrp   and   DO wiissue_bulk_create
 * For scripts:   lSilent = .T. (no dialogs, Msg returns Yes), lCheckStock = .F.
 *=====================================================================
+#DEFINE WIBULK_VER "2026-11-15 GRPID"
 IF TYPE("goWiBulk") = "O" .AND. !ISNULL(goWiBulk)
-	goWiBulk.Show()
-	RETURN
+	IF TYPE("goWiBulk.cVer") = "C" .AND. goWiBulk.cVer == WIBULK_VER
+		goWiBulk.Show()
+		RETURN
+	ENDIF
+	* a form of an older version of this program is still in memory: close it
+	goWiBulk.Release()
+	goWiBulk = .NULL.
+	CLEAR CLASS frmWiBulk
+	CLEAR CLASS frmWbPick
+	CLEAR CLASS wbText
+	CLEAR CLASS wbBtn
+	CLEAR CLASS wbPickBtn
 ENDIF
 PUBLIC goWiBulk
 goWiBulk = CREATEOBJECT("frmWiBulk")
@@ -68,6 +79,7 @@ DEFINE CLASS frmWiBulk AS Form
 	BorderStyle = 2
 	MaxButton = .F.
 	BackColor = RGB(0, 153, 255)
+	cVer = WIBULK_VER
 	cMode = "V"
 	cBulk = ""
 	nGrp = 0
