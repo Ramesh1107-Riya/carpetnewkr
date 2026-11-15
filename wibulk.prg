@@ -36,6 +36,8 @@ DEFINE CLASS wbText AS TextBox
 	FontName = "Arial"
 	FontSize = 10
 	Height = 24
+	* K = select the whole value on entry, so typing replaces it (e.g. the 0 of GRPID)
+	Format = "K"
 	PROCEDURE LostFocus
 		THISFORM.CtlLost(THIS.Name)
 	ENDPROC
@@ -188,7 +190,7 @@ DEFINE CLASS frmWiBulk AS Form
 	THIS.txtAmt.InputMask = "999999999.99"
 	THIS.txtTotSq.InputMask = "99999.99"
 	THIS.txtBal.InputMask = "999999.999"
-	THIS.txtDate.Format = "D"
+	THIS.txtDate.Format = "DK"
 	THIS.txtIssdt.Format = "D"
 	THIS.txtBL.MaxLength = 1
 	THIS.txtStatus.FontBold = .T.
@@ -414,7 +416,9 @@ DEFINE CLASS frmWiBulk AS Form
 	LOCAL lnQty
 	lnQty = THIS.txtQty.Value
 	THIS.nGrp = THIS.txtGrp.Value
-	=THIS.LoadGroup(THIS.nGrp)
+	IF THIS.LoadGroup(THIS.nGrp) = 0 .AND. THIS.nGrp > 0 .AND. !THIS.lSilent
+		WAIT WINDOW "GRPID " + ALLTRIM(STR(THIS.nGrp)) + " has no OL in Casupord - use [Groups...] to pick one." NOWAIT
+	ENDIF
 	THIS.txtParty.Value = THIS.cSupplier
 	THIS.txtDesign.Value = THIS.cDesign
 	THIS.txtTotSq.Value = THIS.nTotSq
