@@ -17,7 +17,7 @@
 * Needs (once):  DO wiissue_addgrp   and   DO wiissue_bulk_create
 * For scripts:   lSilent = .T. (no dialogs, Msg returns Yes), lCheckStock = .F.
 *=====================================================================
-#DEFINE WIBULK_VER "2026-11-15 GRPID"
+#DEFINE WIBULK_VER "2026-11-16 GRPID c"
 IF TYPE("goWiBulk") = "O" .AND. !ISNULL(goWiBulk)
 	IF TYPE("goWiBulk.cVer") = "C" .AND. goWiBulk.cVer == WIBULK_VER
 		goWiBulk.Show()
@@ -311,24 +311,26 @@ DEFINE CLASS frmWiBulk AS Form
 
 	PROCEDURE BtnClick
 	LPARAMETERS tcName
+	* VFP may report an object Name in capitals: compare upper case
+	tcName = UPPER(tcName)
 	DO CASE
-	CASE tcName == "cmdSave"
+	CASE tcName == "CMDSAVE"
 		THIS.SaveEntry()
-	CASE tcName == "cmdEdit"
+	CASE tcName == "CMDEDIT"
 		THIS.EditEntry()
-	CASE tcName == "cmdDelete"
+	CASE tcName == "CMDDELETE"
 		THIS.DeleteEntry()
-	CASE tcName == "cmdCommit"
+	CASE tcName == "CMDCOMMIT"
 		THIS.CommitEntry()
-	CASE tcName == "cmdNew"
+	CASE tcName == "CMDNEW"
 		THIS.AddEntry()
-	CASE tcName == "cmdSearch"
+	CASE tcName == "CMDSEARCH"
 		THIS.FindEntry("")
-	CASE tcName == "cmdGroups"
+	CASE tcName == "CMDGROUPS"
 		THIS.PickGroup()
-	CASE tcName == "cmdFirst" .OR. tcName == "cmdPrev" .OR. tcName == "cmdNext" .OR. tcName == "cmdLast"
+	CASE tcName == "CMDFIRST" .OR. tcName == "CMDPREV" .OR. tcName == "CMDNEXT" .OR. tcName == "CMDLAST"
 		THIS.MoveTo(SUBSTR(tcName, 4))
-	CASE tcName == "cmdExit"
+	CASE tcName == "CMDEXIT"
 		THIS.Release()
 	ENDCASE
 	ENDPROC
@@ -336,16 +338,18 @@ DEFINE CLASS frmWiBulk AS Form
 	* LostFocus of the entry boxes
 	PROCEDURE CtlLost
 	LPARAMETERS tcName
+	* VFP may report an object Name in capitals: compare upper case
+	tcName = UPPER(tcName)
 	IF !(THIS.cMode $ "AE")
 		RETURN
 	ENDIF
 	DO CASE
-	CASE tcName == "txtGrp"
+	CASE tcName == "TXTGRP"
 		THIS.Recalc()
-	CASE tcName == "txtQlty" .OR. tcName == "txtBL"
+	CASE tcName == "TXTQLTY" .OR. tcName == "TXTBL"
 		THIS.QualityInfo()
 		THIS.Recalc()
-	CASE tcName == "txtQty"
+	CASE tcName == "TXTQTY"
 		THIS.Recalc()
 	ENDCASE
 	ENDPROC
@@ -354,8 +358,10 @@ DEFINE CLASS frmWiBulk AS Form
 	* number typed so far is a GRPID (no message for a partly typed number)
 	PROCEDURE CtlChange
 	LPARAMETERS tcName
+	* VFP may report an object Name in capitals: compare upper case
+	tcName = UPPER(tcName)
 	LOCAL laC[1]
-	IF !(THIS.cMode $ "AE") .OR. !(tcName == "txtGrp")
+	IF !(THIS.cMode $ "AE") .OR. !(tcName == "TXTGRP")
 		RETURN
 	ENDIF
 	IF THIS.txtGrp.Value > 0
@@ -725,18 +731,18 @@ DEFINE CLASS frmWiBulk AS Form
 		RETURN
 	ENDIF
 	DO CASE
-	CASE tcWhere == "First"
+	CASE UPPER(tcWhere) == "FIRST"
 		GO TOP
-	CASE tcWhere == "Last"
+	CASE UPPER(tcWhere) == "LAST"
 		GO BOTTOM
-	CASE tcWhere == "Prev"
+	CASE UPPER(tcWhere) == "PREV"
 		IF !BOF()
 			SKIP -1
 		ENDIF
 		IF BOF()
 			GO TOP
 		ENDIF
-	CASE tcWhere == "Next"
+	CASE UPPER(tcWhere) == "NEXT"
 		IF !EOF()
 			SKIP
 		ENDIF
@@ -944,7 +950,8 @@ DEFINE CLASS frmWiBulk AS Form
 	PRIVATE pcWbErr
 	pcWbErr = ""
 	lcOldErr = ON("ERROR")
-	ON ERROR pcWbErr = MESSAGE()
+	* keep the first error: later ones are only its consequences
+	ON ERROR pcWbErr = IIF(EMPTY(pcWbErr), MESSAGE(), pcWbErr)
 	BEGIN TRANSACTION
 	DO CASE
 	CASE tcWhat == "SAVE"
@@ -1038,11 +1045,23 @@ DEFINE CLASS frmWiBulk AS Form
 	SELECT cWbSib
 	SCAN FOR EMPTY(pcWbErr) .AND. !taken .AND. share > 0
 		THIS.RowFromShare(loR)
-		SELECT wi_w
-		APPEND BLANK
-		GATHER NAME loR
+		THIS.AddRow(loR)
 		SELECT cWbSib
 	ENDSCAN
+	ENDPROC
+
+	* a new Wiissue row, inserted with all its values at once: the insert trigger of
+	* Wiissue (RI restrict on Wiqlty.QUALITY) rejects a blank row from APPEND BLANK
+	PROCEDURE AddRow
+	LPARAMETERS loR
+	LOCAL lnI, lnF, lcF
+	lnF = FCOUNT("wi_w")
+	LOCAL laV[lnF]
+	FOR lnI = 1 TO lnF
+		lcF = FIELD(lnI, "wi_w")
+		laV[lnI] = loR.&lcF
+	ENDFOR
+	INSERT INTO wi_w FROM ARRAY laV
 	ENDPROC
 
 	* the OL part of a Wiissue row, from the current cWbSib record
@@ -1142,6 +1161,14 @@ DEFINE CLASS frmWbPick AS Form
 	ENDWITH
 	ENDPROC
 
+	* choose GRPID tnGrp in the list and close (also used by test scripts)
+	PROCEDURE PickId
+	LPARAMETERS tnGrp
+	SELECT cWbGrp
+	LOCATE FOR grpid = tnGrp
+	THIS.Done(FOUND())
+	ENDPROC
+
 	PROCEDURE Done
 	LPARAMETERS tlOk
 	THIS.nPick = IIF(tlOk .AND. !EOF("cWbGrp"), cWbGrp.grpid, 0)
@@ -1156,6 +1183,6 @@ DEFINE CLASS wbPickBtn AS CommandButton
 	Height = 32
 	Width = 100
 	PROCEDURE Click
-		THISFORM.Done(THIS.Name == "cmdOk")
+		THISFORM.Done(UPPER(THIS.Name) == "CMDOK")
 	ENDPROC
 ENDDEFINE
