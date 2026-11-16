@@ -9,15 +9,16 @@
 *
 *   Save    keeps the bulk line in WIISSUE_BULK (Wiissue is not touched yet)
 *   Commit  divides the line over the OLs of its GRPID by SqMt and writes one WIISSUE
-*           row per OL (Wiissue.GRPID = the line's BULKID).  Commit again after an
+*           row per OL (Wiissue.GRPID = the Order Form GRPID, e.g. "1002";
+*           Wiissue.BULKID = the line's BULKID).  Commit again after an
 *           Edit, or after OLs were added to / taken out of the GRPID.
 *   Edit / Delete   blocked once a Wiissue row of the line has a printed SlipNo
 *   Search  list of the saved lines (NOT COMMITTED first), or type GRPID, Bill No or OL No.   |<  <  >  >|  move through the lines.
 *
-* Needs (once):  DO wiissue_addgrp   and   DO wiissue_bulk_create
+* Needs (once):  DO wiissue_addgrp,  DO wiissue_bulk_create  and  DO wiissue_addbulkid
 * For scripts:   lSilent = .T. (no dialogs, Msg returns Yes), lCheckStock = .F.
 *=====================================================================
-#DEFINE WIBULK_VER "2026-11-16 GRPID d"
+#DEFINE WIBULK_VER "2026-11-16 GRPID e"
 IF TYPE("goWiBulk") = "O" .AND. !ISNULL(goWiBulk)
 	IF TYPE("goWiBulk.cVer") = "C" .AND. goWiBulk.cVer == WIBULK_VER
 		goWiBulk.Show()
@@ -138,6 +139,10 @@ DEFINE CLASS frmWiBulk AS Form
 	USE wiissue AGAIN SHARED IN 0 ALIAS wi_w
 	IF TYPE("wi_w.grpid") = "U"
 		THIS.Msg("Wiissue has no GRPID column." + CHR(13) + "Run  DO wiissue_addgrp  once (all users out of the program).", 16)
+		RETURN .F.
+	ENDIF
+	IF TYPE("wi_w.bulkid") = "U"
+		THIS.Msg("Wiissue has no BULKID column." + CHR(13) + "Run  DO wiissue_addbulkid  once (all users out of the program).", 16)
 		RETURN .F.
 	ENDIF
 	IF !USED("casupord")
@@ -601,14 +606,14 @@ DEFINE CLASS frmWiBulk AS Form
 	THIS.ShowShares()
 	ENDPROC
 
-	* division of a committed line = the Wiissue rows that carry its BULKID
+	* division of a committed line = the Wiissue rows that carry its BULKID (Wiissue.BULKID)
 	PROCEDURE LoadSaved
 	LOCAL lcB
 	lcB = THIS.cBulk
 	THIS.NewShareCursor()
 	SELECT w.ol_no, w.card_no, w.weaver, w.po_no, b.sqmt, w.quantity ;
 		FROM wi_w w LEFT JOIN cabuyord b ON b.ol_no = w.ol_no ;
-		WHERE w.grpid = lcB ;
+		WHERE w.bulkid = lcB ;
 		ORDER BY 1 ;
 		INTO CURSOR cWbL
 	SELECT cWbL
@@ -632,7 +637,7 @@ DEFINE CLASS frmWiBulk AS Form
 		RETURN "NOT COMMITTED"
 	ENDIF
 	SELECT COUNT(*) FROM wi_w ;
-		WHERE grpid = lcB AND ALLTRIM(billno) == ALLTRIM(wbk.billno) AND ALLTRIM(quality) == ALLTRIM(wbk.quality) ;
+		WHERE bulkid = lcB AND ALLTRIM(grpid) == ALLTRIM(STR(lnG)) AND ALLTRIM(billno) == ALLTRIM(wbk.billno) AND ALLTRIM(quality) == ALLTRIM(wbk.quality) ;
 		AND ALLTRIM(colour) == ALLTRIM(wbk.colour) AND date = wbk.date AND ALLTRIM(party) == ALLTRIM(wbk.party) ;
 		AND UPPER(optionbl) == UPPER(wbk.optionbl) ;
 		AND ol_no IN (SELECT ol_no FROM casupord WHERE grpid = lnG) INTO ARRAY laM
@@ -763,7 +768,7 @@ DEFINE CLASS frmWiBulk AS Form
 	tnPrn = 0
 	lnN = 0
 	IF !EMPTY(tcBulk)
-		SELECT COUNT(*), SUM(quantity), SUM(IIF(EMPTY(slipno), 0, 1)) FROM wi_w WHERE grpid = tcBulk INTO ARRAY laI
+		SELECT COUNT(*), SUM(quantity), SUM(IIF(EMPTY(slipno), 0, 1)) FROM wi_w WHERE bulkid = tcBulk INTO ARRAY laI
 		* no rows: VFP6 may leave the array untouched (.F.) or give NULL sums
 		IF _TALLY > 0 .AND. TYPE("laI[1]") = "N"
 			lnN = laI[1]
@@ -892,7 +897,10 @@ DEFINE CLASS frmWiBulk AS Form
 	ENDIF
 	IF THIS.lCheckStock
 		lnAllowed = THIS.StockBalance()
-		IF THIS.cMode == "E" .AND. lcQ == THIS.cOldQlty .AND. lcC == THIS.cOldColour
+		* the line's own committed kg is already out of stock: give it back (only
+		* when it was committed - a saved, not committed line took nothing yet)
+		IF THIS.cMode == "E" .AND. lcQ == THIS.cOldQlty .AND. lcC == THIS.cOldColour ;
+				.AND. THIS.GroupInfo(THIS.cBulk, 0, 0) > 0
 			lnAllowed = lnAllowed + THIS.nOldQty
 		ENDIF
 		IF lnQty > lnAllowed
@@ -1045,13 +1053,15 @@ DEFINE CLASS frmWiBulk AS Form
 	SCATTER NAME loR BLANK
 	FOR lnI = 1 TO FCOUNT("wi_w")
 		lcF = FIELD(lnI, "wi_w")
-		IF !INLIST(lcF, "GRPID", "OL_NO", "CARD_NO", "WEAVER", "PO_NO", "QUANTITY", "AMT") .AND. TYPE("wbk." + lcF) # "U"
+		IF !INLIST(lcF, "GRPID", "BULKID", "OL_NO", "CARD_NO", "WEAVER", "PO_NO", "QUANTITY", "AMT") .AND. TYPE("wbk." + lcF) # "U"
 			loR.&lcF = EVALUATE("wbk." + lcF)
 		ENDIF
 	ENDFOR
-	loR.grpid = lcB
+	* Wiissue.GRPID = the Order Form GRPID, Wiissue.BULKID = this bulk line
+	loR.grpid = ALLTRIM(STR(wbk.grpid))
+	loR.bulkid = lcB
 	SELECT wi_w
-	SCAN FOR EMPTY(pcWbErr) .AND. grpid = lcB
+	SCAN FOR EMPTY(pcWbErr) .AND. bulkid = lcB
 		SELECT cWbSib
 		LOCATE FOR ALLTRIM(ol_no) == ALLTRIM(wi_w.ol_no) .AND. !taken .AND. share > 0
 		IF FOUND()
@@ -1103,7 +1113,7 @@ DEFINE CLASS frmWiBulk AS Form
 	LOCAL lcB
 	lcB = THIS.cBulk
 	SELECT wi_w
-	DELETE FOR grpid = lcB .AND. !EMPTY(lcB)
+	DELETE FOR bulkid = lcB .AND. !EMPTY(lcB)
 	SELECT wbk
 	DELETE
 	ENDPROC
@@ -1224,12 +1234,12 @@ DEFINE CLASS frmWbFind AS Form
 		OPEN DATABASE carpet SHARED
 	ENDIF
 	SET DATABASE TO carpet
-	* Wiissue rows per bulk line (Wiissue.GRPID = the line's BULKID)
-	SELECT grpid, COUNT(*) AS nrow FROM wiissue ;
-		WHERE !EMPTY(grpid) GROUP BY grpid INTO CURSOR cWbCnt
+	* Wiissue rows per bulk line (Wiissue.BULKID = the line's BULKID)
+	SELECT bulkid, COUNT(*) AS nrow FROM wiissue ;
+		WHERE !EMPTY(bulkid) GROUP BY bulkid INTO CURSOR cWbCnt
 	SELECT IIF(ISNULL(c.nrow), "NOT COMMITTED", "COMMITTED    ") AS status, ;
 		b.grpid, b.billno, b.date, b.party, b.quality, b.colour, b.quantity, b.nol, b.bulkid ;
-		FROM wiissue_bulk b LEFT JOIN cWbCnt c ON c.grpid = b.bulkid ;
+		FROM wiissue_bulk b LEFT JOIN cWbCnt c ON c.bulkid = b.bulkid ;
 		ORDER BY 1 DESC, 4 DESC, 2 DESC ;
 		INTO CURSOR cWbFind
 	USE IN cWbCnt
