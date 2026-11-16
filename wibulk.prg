@@ -12,12 +12,12 @@
 *           row per OL (Wiissue.GRPID = the line's BULKID).  Commit again after an
 *           Edit, or after OLs were added to / taken out of the GRPID.
 *   Edit / Delete   blocked once a Wiissue row of the line has a printed SlipNo
-*   Search  by GRPID, Bill No or OL No.   |<  <  >  >|  move through the lines.
+*   Search  list of the saved lines (NOT COMMITTED first), or type GRPID, Bill No or OL No.   |<  <  >  >|  move through the lines.
 *
 * Needs (once):  DO wiissue_addgrp   and   DO wiissue_bulk_create
 * For scripts:   lSilent = .T. (no dialogs, Msg returns Yes), lCheckStock = .F.
 *=====================================================================
-#DEFINE WIBULK_VER "2026-11-16 GRPID c"
+#DEFINE WIBULK_VER "2026-11-16 GRPID d"
 IF TYPE("goWiBulk") = "O" .AND. !ISNULL(goWiBulk)
 	IF TYPE("goWiBulk.cVer") = "C" .AND. goWiBulk.cVer == WIBULK_VER
 		goWiBulk.Show()
@@ -28,6 +28,7 @@ IF TYPE("goWiBulk") = "O" .AND. !ISNULL(goWiBulk)
 	goWiBulk = .NULL.
 	CLEAR CLASS frmWiBulk
 	CLEAR CLASS frmWbPick
+	CLEAR CLASS frmWbFind
 	CLEAR CLASS wbText
 	CLEAR CLASS wbBtn
 	CLEAR CLASS wbPickBtn
@@ -775,13 +776,35 @@ DEFINE CLASS frmWiBulk AS Form
 	RETURN lnN
 	ENDFUNC
 
-	* Search: GRPID (number), Bill No or OL No
+	* Search: GRPID (number), Bill No or OL No.  With no key the Find window opens:
+	* pick a saved line from its list, or type a key there.
+	* (VFP 6 has no INPUTBOX(), so the window is our own.)
 	FUNCTION FindEntry
 	LPARAMETERS tcKey
-	LOCAL lcKey, lnRec, laG[1], llF
+	LOCAL lcKey, lnRec, laG[1], llF, loF, lcBulk
 	lcKey = UPPER(ALLTRIM(tcKey))
 	IF EMPTY(lcKey) .AND. !THIS.lSilent
-		lcKey = UPPER(ALLTRIM(INPUTBOX("GRPID, Bill No or OL No to find:", THIS.Caption, "")))
+		loF = CREATEOBJECT("frmWbFind")
+		IF TYPE("loF") # "O" .OR. ISNULL(loF)
+			RETURN .F.
+		ENDIF
+		loF.Show(1)
+		lcBulk = ALLTRIM(loF.cBulk)
+		lcKey = UPPER(ALLTRIM(loF.cKey))
+		loF.Release()
+		IF !EMPTY(lcBulk)
+			SELECT wbk
+			lnRec = RECNO()
+			LOCATE FOR ALLTRIM(bulkid) == lcBulk
+			IF FOUND()
+				THIS.ToScreen()
+				THIS.SetMode("V")
+				RETURN .T.
+			ENDIF
+			IF lnRec > 0 .AND. lnRec <= RECCOUNT()
+				GO lnRec
+			ENDIF
+		ENDIF
 	ENDIF
 	IF EMPTY(lcKey)
 		RETURN .F.
@@ -1172,6 +1195,107 @@ DEFINE CLASS frmWbPick AS Form
 	PROCEDURE Done
 	LPARAMETERS tlOk
 	THIS.nPick = IIF(tlOk .AND. !EOF("cWbGrp"), cWbGrp.grpid, 0)
+	THIS.Hide()
+	ENDPROC
+ENDDEFINE
+
+*---------------------------------------------------------------------
+* [Search]  the saved bulk lines, NOT COMMITTED first.  Pick one and OK (the form
+* moves to it; then Commit), or type a GRPID / Bill No / OL No and OK.
+DEFINE CLASS frmWbFind AS Form
+	Caption = "Bulk issue lines - Search"
+	Height = 440
+	Width = 780
+	AutoCenter = .T.
+	DataSession = 2
+	BorderStyle = 2
+	MaxButton = .F.
+	MinButton = .F.
+	WindowType = 1
+	cBulk = ""
+	cKey = ""
+
+	PROCEDURE Init
+	SET TALK OFF
+	SET DATE TO BRITISH
+	SET CENTURY ON
+	SET DELETED ON
+	IF !DBUSED("carpet")
+		OPEN DATABASE carpet SHARED
+	ENDIF
+	SET DATABASE TO carpet
+	* Wiissue rows per bulk line (Wiissue.GRPID = the line's BULKID)
+	SELECT grpid, COUNT(*) AS nrow FROM wiissue ;
+		WHERE !EMPTY(grpid) GROUP BY grpid INTO CURSOR cWbCnt
+	SELECT IIF(ISNULL(c.nrow), "NOT COMMITTED", "COMMITTED    ") AS status, ;
+		b.grpid, b.billno, b.date, b.party, b.quality, b.colour, b.quantity, b.nol, b.bulkid ;
+		FROM wiissue_bulk b LEFT JOIN cWbCnt c ON c.grpid = b.bulkid ;
+		ORDER BY 1 DESC, 4 DESC, 2 DESC ;
+		INTO CURSOR cWbFind
+	USE IN cWbCnt
+	THIS.AddObject("lblKey", "Label")
+	WITH THIS.lblKey
+		.Caption = "Type GRPID, Bill No or OL No  (or leave empty and pick a line):"
+		.Left = 10
+		.Top = 14
+		.Width = 380
+		.FontName = "Arial"
+		.FontSize = 9
+		.Visible = .T.
+	ENDWITH
+	THIS.AddObject("txtKey", "TextBox")
+	WITH THIS.txtKey
+		.Left = 395
+		.Top = 10
+		.Width = 160
+		.FontName = "Arial"
+		.FontSize = 10
+		.Value = ""
+		.Visible = .T.
+	ENDWITH
+	THIS.AddObject("grd", "Grid")
+	WITH THIS.grd
+		.Left = 10
+		.Top = 42
+		.Width = 760
+		.Height = 340
+		.FontName = "Arial"
+		.FontSize = 9
+		.ReadOnly = .T.
+		.DeleteMark = .F.
+		.RecordSource = "cWbFind"
+		.Visible = .T.
+	ENDWITH
+	THIS.AddObject("cmdOk", "wbPickBtn")
+	WITH THIS.cmdOk
+		.Caption = "OK"
+		.Left = 560
+		.Top = 395
+		.Default = .T.
+		.Visible = .T.
+	ENDWITH
+	THIS.AddObject("cmdCancel", "wbPickBtn")
+	WITH THIS.cmdCancel
+		.Caption = "Cancel"
+		.Left = 670
+		.Top = 395
+		.Cancel = .T.
+		.Visible = .T.
+	ENDWITH
+	SELECT cWbFind
+	GO TOP
+	ENDPROC
+
+	PROCEDURE Done
+	LPARAMETERS tlOk
+	THIS.cBulk = ""
+	THIS.cKey = ""
+	IF tlOk
+		THIS.cKey = ALLTRIM(THIS.txtKey.Value)
+		IF EMPTY(THIS.cKey) .AND. !EOF("cWbFind") .AND. RECCOUNT("cWbFind") > 0
+			THIS.cBulk = ALLTRIM(cWbFind.bulkid)
+		ENDIF
+	ENDIF
 	THIS.Hide()
 	ENDPROC
 ENDDEFINE
