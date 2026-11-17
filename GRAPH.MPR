@@ -1,6 +1,6 @@
 *       *********************************************************
 *       *                                                         
-*       * 06/10/2026             GRAPH.MPR              08:45:02  
+*       * 17/11/2026             GRAPH.MPR              13:19:52  
 *       *                                                         
 *       *********************************************************
 *       *                                                         
@@ -26,18 +26,18 @@
 SET SYSMENU TO
 SET SYSMENU AUTOMATIC
 
-DEFINE PAD _7kt0ir7js OF _MSYSMENU PROMPT "Graph Transaction" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknh4 OF _MSYSMENU PROMPT "Graph Transaction" COLOR SCHEME 3 ;
 	KEY ALT+G, ""
-DEFINE PAD _7kt0ir7jt OF _MSYSMENU PROMPT "Report" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknh5 OF _MSYSMENU PROMPT "Report" COLOR SCHEME 3 ;
 	KEY ALT+R, ""
-DEFINE PAD _7kt0ir7ju OF _MSYSMENU PROMPT "S\<ystem Utilities" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknh6 OF _MSYSMENU PROMPT "S\<ystem Utilities" COLOR SCHEME 3 ;
 	KEY ALT+Y, ""
-DEFINE PAD _7kt0ir7jv OF _MSYSMENU PROMPT "Exit" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknh7 OF _MSYSMENU PROMPT "Exit" COLOR SCHEME 3 ;
 	KEY ALT+E, ""
-ON PAD _7kt0ir7js OF _MSYSMENU ACTIVATE POPUP graphtrans
-ON PAD _7kt0ir7jt OF _MSYSMENU ACTIVATE POPUP newitem
-ON PAD _7kt0ir7ju OF _MSYSMENU ACTIVATE POPUP _4y80s2hh1
-ON SELECTION PAD _7kt0ir7jv OF _MSYSMENU do endprg
+ON PAD _7lz0sknh4 OF _MSYSMENU ACTIVATE POPUP graphtrans
+ON PAD _7lz0sknh5 OF _MSYSMENU ACTIVATE POPUP newitem
+ON PAD _7lz0sknh6 OF _MSYSMENU ACTIVATE POPUP _4y80s2hh1
+ON SELECTION PAD _7lz0sknh7 OF _MSYSMENU do endprg
 
 DEFINE POPUP graphtrans MARGIN RELATIVE SHADOW COLOR SCHEME 4
 DEFINE BAR 1 OF graphtrans PROMPT "Master Graph Entry/Edit/Delete"

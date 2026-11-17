@@ -55,7 +55,7 @@ pstartdt={^2025/01/01}
 *Define window repwindow from 0,0 to 60,160 in desktop
 
 * Open Necessary Data Files
-DEFINE WINDOW wReport FROM 0,0 to 100,200 TITLE "Output Preview" SYSTEM NOCLOSE && use in report forms 
+DEFINE WINDOW wReport FROM 0,0 to 100,200 TITLE "Output Preview" SYSTEM NOCLOSE && use in report forms
 
 do form pass
 READ EVENTS
@@ -63,6 +63,24 @@ If oklogin=.F.
 	Quit
 *WAIT WINDOW "Loading ... please wait" NOWAIT
 ELSE
+	* "close all" signal (close_all.prg, System Utilities - Close All Terminals):
+	* while it is on only the supervisor can work; then watch for it while running
+	IF closewatch("ISON")
+		IF plevel="LEVEL5"
+			IF MESSAGEBOX("Carpetnew software is CLOSED for all terminals." + CHR(13) + ;
+					closewatch("INFO") + CHR(13) + CHR(13) + ;
+					"Open it again for everyone now?" + CHR(13) + ;
+					"(No = you work alone; open it later with System Utilities - Close All Terminals.)", ;
+					36, "Carpetnew") = 6
+				=close_all("OPEN")
+			ENDIF
+		ELSE
+			=MESSAGEBOX("Carpetnew software is closed for maintenance." + CHR(13) + CHR(13) + ;
+				closewatch("INFO") + CHR(13) + CHR(13) + "Try again later.", 48, "Carpetnew")
+			QUIT
+		ENDIF
+	ENDIF
+	=closewatch("START")
 	DO CASE
 		CASE plevel="LEVEL1"
 			Do Carpet.mpr && Urgen 

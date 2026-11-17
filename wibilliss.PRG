@@ -3,26 +3,38 @@ SET TALK OFF
 SET SAFE OFF
 
 IF !EMPTY(m.OL_NO)
-	SELECT i.DATE,i.BILLNO,i.SLIPNO,i.QUALITY,i.PARTY,i.COLOUR,i.RATE,i.QUANTITY,i.AMT,i.OL_NO,j.design;
+	SELECT i.DATE,i.BILLNO,i.SLIPNO,i.QUALITY,i.PARTY,i.COLOUR,i.RATE,SUM(i.QUANTITY) AS quantity,i.AMT,i.OL_NO,j.design,i.GrpID;
 	FROM WIISSUE i;
 	Join CABUYORD j;
 	ON i.OL_NO=j.OL_NO;
-	WHERE i.Billno=Alltrim(m.BillNo);
-	ORDER BY i.Quality,i.Colour;
-	INTO CURSOR ISS1
-Else
-	SELECT i.DATE,i.BILLNO,i.SLIPNO,i.QUALITY,i.PARTY,i.COLOUR,i.RATE,i.QUANTITY,i.AMT,i.OL_NO,j.design;
-	FROM WIISSUE i;
-	Join CABUYORD j;
-	ON i.OL_NO=j.OL_NO;
-	WHERE i.Billno=Alltrim(m.BillNo);
+	WHERE i.OL_NO==Alltrim(m.OL_NO);
 	ORDER BY i.Quality,i.Colour;
 	GROUP BY i.Quality,i.Colour;
 	INTO CURSOR ISS1
 
-	SELECT DISTINCT OL_NO;
+	SELECT DISTINCT OL_NO;  &&This will display single ol_NO
 	FROM WIISSUE;
-	WHERE Billno=Alltrim(m.BillNo);
+	WHERE OL_NO==Alltrim(m.OL_NO);
+	INTO CURSOR temp2
+	
+	Select temp2
+	Dimension cardolno(20,1) && array is declared row=20,col=1
+	Store '' to cardolno && initialize array with '', by default .F.
+	Copy to Array Cardolno FIELDS Ol_no
+Else
+	SELECT i.DATE,i.BILLNO,i.SLIPNO,i.QUALITY,i.PARTY,i.COLOUR,i.RATE,SUM(i.QUANTITY) AS quantity,i.AMT,i.OL_NO,j.design,i.GrpID;
+	FROM WIISSUE i;
+	Join CABUYORD j;
+	ON i.OL_NO=j.OL_NO;
+	WHERE i.Billno==Alltrim(m.BillNo);
+	ORDER BY i.Quality,i.Colour;
+	GROUP BY i.Quality,i.Colour;
+	INTO CURSOR ISS1
+
+
+	SELECT DISTINCT OL_NO;  &&This will display max 12 ol_nos
+	FROM WIISSUE;
+	WHERE Billno==Alltrim(m.BillNo);
 	INTO CURSOR temp2
 	
 	Select temp2

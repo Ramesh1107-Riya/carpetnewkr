@@ -6,7 +6,7 @@ SET PROCEDURE TO Catool
 * Error Trapping Procedure
 ON ERROR DO SystemErr WITH ERROR(), MESSAGE(), LINENO(), MESSAGE(1), PROGRAM()
 
-SELECT s.Issdt,b.Po_no,s.Ol_no,s.Supplier,b.Design,b.Colour,b.Quality,b.szcode,b.Qty,b.Sqmt,b.breadth,b.length,s.wev_last_dt,b.bcode,b.notes,b.comment;
+SELECT s.Issdt,b.Po_no,s.Ol_no,s.Supplier,b.Design,b.Colour,b.Quality,b.szcode,b.Qty,b.Sqmt,b.breadth,b.length,s.wev_last_dt,b.bcode,b.notes,b.comment,s.grpid;
 FROM  Carpet!cabuyord b, Carpet!casupord s;
 Where b.ol_no=s.ol_no .and. s.Issdt=m.Issdt .and. s.Supplier=alltrim(m.Supplier) .and. b.Design=m.Design .and. b.Colour=m.Colour .and. b.Quality=m.Quality;
 Into Cursor temprepview 
@@ -16,12 +16,12 @@ Dimension cardolno(37,5) && array is declared row=37,col=3
 Store '' to cardolno && initialize array with '', by default .F.
 Copy to Array Cardolno FIELDS Ol_no,szcode,sqmt,wev_last_dt,po_no
 
-SELECT Issdt,Po_no,Ol_no,Supplier,Design,Colour,Quality,szcode,sum(Sqmt) Sqmt,Sum(Qty)Qty,breadth,length,wev_last_dt,bcode,notes,comment;
+SELECT Issdt,Po_no,Ol_no,Supplier,Design,Colour,Quality,szcode,sum(Sqmt) Sqmt,Sum(Qty)Qty,breadth,length,wev_last_dt,bcode,notes,comment,grpid;
 FROM  temprepview;
 Group by Design,Quality,Colour; 
 Into Cursor temprepview1
 **********************************************************************	
-SELECT j.*,k.Issdt, k.Ol_no, k.Supplier, k.Qty, k.breadth, k.length, k.wev_last_dt,k.sqmt,k.bcode,k.po_no,k.notes,k.comment;
+SELECT j.*,k.Issdt, k.Ol_no, k.Supplier, k.Qty, k.breadth, k.length, k.wev_last_dt,k.sqmt,k.bcode,k.po_no,k.notes,k.comment,k.grpid;
 FROM  yrcalc j, temprepview1 k;
 Where j.design=k.design .and. j.basecolour=k.Colour .and. j.quality=k.quality .and. !empty(j.date);
 Into Cursor temprepview2  Nofilter
@@ -80,14 +80,14 @@ Endscan
 *we calculate individual yarnrequred for same color with all values than sum in the next query
 **Report for Quality, Colour>26, select yrcalc2a.dbf for 2nd option, Select int(val(alltrim(i.slno))) as slnoval
 Select i.slno as slnoval,j.po_no,i.quality,i.colour,i.sqmt,i.ply,i.loop,i.rod,i.sqmt*i.sqmyarn as yrreqkgall,i.avgconsm,i.design,i.basecolour,j.szcode,i.caquality,j.bcode,;
-		j.Issdt,j.Ol_no,j.Supplier,j.Qty,j.breadth,j.length,j.wev_last_dt,j.notes,j.comment;  
+		j.Issdt,j.Ol_no,j.Supplier,j.Qty,j.breadth,j.length,j.wev_last_dt,j.notes,j.comment,j.grpid;
 From yrcalc2 i, temprepview1 j;
 Where i.design=j.design .and. i.basecolour=j.Colour .and. i.caquality=j.quality;
 ORDER BY i.quality,i.colour;
 Into cursor yrcalc2b 
 
 Select slnoval as slno,po_no,quality,colour,sqmt,ply,loop,rod,yrreqkgall,avgconsm,design,basecolour,szcode,caquality,bcode,;
-		Issdt,Ol_no,Supplier,Qty,breadth,length,wev_last_dt,notes,comment;  
+		Issdt,Ol_no,Supplier,Qty,breadth,length,wev_last_dt,notes,comment,grpid;  
 From yrcalc2b ;
 ORDER BY slnoval,quality,colour;
 Into cursor yrcalc2a 

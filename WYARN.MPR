@@ -1,6 +1,6 @@
 *       *********************************************************
 *       *                                                         
-*       * 06/10/2026             WYARN.MPR              08:45:03  
+*       * 17/11/2026             WYARN.MPR              13:19:53  
 *       *                                                         
 *       *********************************************************
 *       *                                                         
@@ -26,21 +26,21 @@
 SET SYSMENU TO
 SET SYSMENU AUTOMATIC
 
-DEFINE PAD _7kt0ir7x3 OF _MSYSMENU PROMPT "Systerm Setup" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknvx OF _MSYSMENU PROMPT "Systerm Setup" COLOR SCHEME 3 ;
 	KEY ALT+S, ""
-DEFINE PAD _7kt0ir7x4 OF _MSYSMENU PROMPT "Data Entry" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknvy OF _MSYSMENU PROMPT "Data Entry" COLOR SCHEME 3 ;
 	KEY ALT+D, ""
-DEFINE PAD _7kt0ir7x5 OF _MSYSMENU PROMPT "Report" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknvz OF _MSYSMENU PROMPT "Report" COLOR SCHEME 3 ;
 	KEY ALT+R, ""
-DEFINE PAD _7kt0ir7x6 OF _MSYSMENU PROMPT "System Utilities" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknw0 OF _MSYSMENU PROMPT "System Utilities" COLOR SCHEME 3 ;
 	KEY ALT+S, ""
-DEFINE PAD _7kt0ir7x7 OF _MSYSMENU PROMPT "Exit" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0sknw1 OF _MSYSMENU PROMPT "Exit" COLOR SCHEME 3 ;
 	KEY ALT+E, ""
-ON PAD _7kt0ir7x3 OF _MSYSMENU ACTIVATE POPUP systermset
-ON PAD _7kt0ir7x4 OF _MSYSMENU ACTIVATE POPUP dataentry
-ON PAD _7kt0ir7x5 OF _MSYSMENU ACTIVATE POPUP report
-ON PAD _7kt0ir7x6 OF _MSYSMENU ACTIVATE POPUP newitem
-ON SELECTION PAD _7kt0ir7x7 OF _MSYSMENU do closeall in errutil
+ON PAD _7lz0sknvx OF _MSYSMENU ACTIVATE POPUP systermset
+ON PAD _7lz0sknvy OF _MSYSMENU ACTIVATE POPUP dataentry
+ON PAD _7lz0sknvz OF _MSYSMENU ACTIVATE POPUP report
+ON PAD _7lz0sknw0 OF _MSYSMENU ACTIVATE POPUP newitem
+ON SELECTION PAD _7lz0sknw1 OF _MSYSMENU do closeall in errutil
 
 DEFINE POPUP systermset MARGIN RELATIVE SHADOW COLOR SCHEME 4
 DEFINE BAR 1 OF systermset PROMPT "Wool Quality"

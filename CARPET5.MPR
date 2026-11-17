@@ -1,6 +1,6 @@
 *       *********************************************************
 *       *                                                         
-*       * 06/10/2026            CARPET5.MPR             08:45:06  
+*       * 17/11/2026            CARPET5.MPR             13:19:57  
 *       *                                                         
 *       *********************************************************
 *       *                                                         
@@ -26,21 +26,21 @@
 SET SYSMENU TO
 SET SYSMENU AUTOMATIC
 
-DEFINE PAD _7kt0irawk OF _MSYSMENU PROMPT "System Setup" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0skrek OF _MSYSMENU PROMPT "System Setup" COLOR SCHEME 3 ;
 	KEY ALT+S, ""
-DEFINE PAD _7kt0irawl OF _MSYSMENU PROMPT "Transaction" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0skrel OF _MSYSMENU PROMPT "Transaction" COLOR SCHEME 3 ;
 	KEY ALT+T, ""
-DEFINE PAD _7kt0irawm OF _MSYSMENU PROMPT "Report" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0skrem OF _MSYSMENU PROMPT "Report" COLOR SCHEME 3 ;
 	KEY ALT+R, ""
-DEFINE PAD _7kt0irawn OF _MSYSMENU PROMPT "System Utilities" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0skren OF _MSYSMENU PROMPT "System Utilities" COLOR SCHEME 3 ;
 	KEY ALT+S, ""
-DEFINE PAD _7kt0irawo OF _MSYSMENU PROMPT "Exit" COLOR SCHEME 3 ;
+DEFINE PAD _7lz0skreo OF _MSYSMENU PROMPT "Exit" COLOR SCHEME 3 ;
 	KEY ALT+E, ""
-ON PAD _7kt0irawk OF _MSYSMENU ACTIVATE POPUP systemsetu
-ON PAD _7kt0irawl OF _MSYSMENU ACTIVATE POPUP transactio
-ON PAD _7kt0irawm OF _MSYSMENU ACTIVATE POPUP report
-ON PAD _7kt0irawn OF _MSYSMENU ACTIVATE POPUP systemutil
-ON SELECTION PAD _7kt0irawo OF _MSYSMENU do closeall in errutil
+ON PAD _7lz0skrek OF _MSYSMENU ACTIVATE POPUP systemsetu
+ON PAD _7lz0skrel OF _MSYSMENU ACTIVATE POPUP transactio
+ON PAD _7lz0skrem OF _MSYSMENU ACTIVATE POPUP report
+ON PAD _7lz0skren OF _MSYSMENU ACTIVATE POPUP systemutil
+ON SELECTION PAD _7lz0skreo OF _MSYSMENU do closeall in errutil
 
 DEFINE POPUP systemsetu MARGIN RELATIVE SHADOW COLOR SCHEME 4
 DEFINE BAR 1 OF systemsetu PROMPT "Buyer Detail"

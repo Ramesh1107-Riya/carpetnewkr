@@ -14,10 +14,10 @@ PLEVEL="SUPERVISOR"
 Public msdate,medate,pstartdt,m.Text1,m.Text2
 Set Date to briti
 SET cENTURY ON
-pstartdt={^2026/01/01}
-msdate={^2026/01/01}
+pstartdt={^2015/01/01}
+msdate={^2015/01/01}
 medate=date()
-m.Text1={^2026/01/01}
+m.Text1={^2015/01/01}
 m.Text2=date()
 
 Public plevel
