@@ -256,6 +256,9 @@ DEFINE CLASS frmWiBulk AS Form
 	THIS.txtBal.InputMask = "999999.999"
 	THIS.txtDate.Format = "DK"
 	THIS.txtIssdt.Format = "D"
+	* ! = upper case only; K = select all on entry
+	THIS.txtQlty.Format = "!K"
+	THIS.txtColour.Format = "!K"
 	THIS.txtBL.MaxLength = 1
 	THIS.txtStatus.FontBold = .T.
 	THIS.AddObject("lstSh", "ListBox")
@@ -540,11 +543,15 @@ DEFINE CLASS frmWiBulk AS Form
 
 	* ---------- yarn quality: type and rate ----------
 	FUNCTION QualityInfo
-	LOCAL lcQ, llOk
-	lcQ = ALLTRIM(THIS.txtQlty.Value)
+	LOCAL lcQ, llOk, lcAnsi
+	lcQ = UPPER(ALLTRIM(THIS.txtQlty.Value))
 	llOk = .F.
+	* ANSI ON: exact match ("AB" must not find "ABC", "" must not find anything)
+	lcAnsi = SET("ANSI")
+	SET ANSI ON
 	SELECT ytype, srate, srateb FROM wiqlty WHERE quality = lcQ INTO CURSOR cWbQ
-	IF RECCOUNT("cWbQ") > 0
+	SET ANSI &lcAnsi
+	IF !EMPTY(lcQ) .AND. RECCOUNT("cWbQ") > 0
 		llOk = .T.
 		THIS.txtYtype.Value = cWbQ.ytype
 		THIS.txtRate.Value = IIF(UPPER(ALLTRIM(THIS.txtBL.Value)) == "L", cWbQ.srate, cWbQ.srateb)
@@ -562,8 +569,8 @@ DEFINE CLASS frmWiBulk AS Form
 	FUNCTION StockBalance
 	LOCAL lcProc
 	PUBLIC Psquality, Pscolour, Pbalance, Pcomment, Pdyewht
-	Psquality = ALLTRIM(THIS.txtQlty.Value)
-	Pscolour = ALLTRIM(THIS.txtColour.Value)
+	Psquality = UPPER(ALLTRIM(THIS.txtQlty.Value))
+	Pscolour = UPPER(ALLTRIM(THIS.txtColour.Value))
 	Pbalance = 0
 	Pcomment = "Dyed Yarn Issue"
 	Pdyewht = "D"
@@ -893,8 +900,8 @@ DEFINE CLASS frmWiBulk AS Form
 	FUNCTION Validate
 	LOCAL lnGrp, lcQ, lcC, lnQty, ldDate, lcAnsi, lnAllowed, laD[1], lcMy
 	lnGrp = THIS.txtGrp.Value
-	lcQ = ALLTRIM(THIS.txtQlty.Value)
-	lcC = ALLTRIM(THIS.txtColour.Value)
+	lcQ = UPPER(ALLTRIM(THIS.txtQlty.Value))
+	lcC = UPPER(ALLTRIM(THIS.txtColour.Value))
 	lnQty = THIS.txtQty.Value
 	ldDate = THIS.txtDate.Value
 	IF lnGrp <= 0
@@ -915,8 +922,11 @@ DEFINE CLASS frmWiBulk AS Form
 	IF !(UPPER(ALLTRIM(THIS.txtBL.Value)) $ "BL") .OR. EMPTY(THIS.txtBL.Value)
 		RETURN "Type B for Ball yarn or L for Lachhi yarn."
 	ENDIF
+	IF EMPTY(lcQ)
+		RETURN "Yarn Quality must be entered."
+	ENDIF
 	IF !THIS.QualityInfo()
-		RETURN "Yarn Quality " + lcQ + " is not in the yarn quality list."
+		RETURN "Yarn Quality " + lcQ + " is not in the yarn quality list (Wiqlty)."
 	ENDIF
 	lcAnsi = SET("ANSI")
 	SET ANSI ON
@@ -924,8 +934,11 @@ DEFINE CLASS frmWiBulk AS Form
 	SET ANSI &lcAnsi
 	lnAllowed = RECCOUNT("cWbC")
 	USE IN cWbC
-	IF EMPTY(lcC) .OR. lnAllowed = 0
-		RETURN "Yarn Colour " + lcC + " is not in the colour list."
+	IF EMPTY(lcC)
+		RETURN "Yarn Colour must be entered."
+	ENDIF
+	IF lnAllowed = 0
+		RETURN "Yarn Colour " + lcC + " is not in the colour list (Cacolour)."
 	ENDIF
 	IF lnQty <= 0
 		RETURN "Net Wt must be more than zero."
@@ -1080,8 +1093,8 @@ DEFINE CLASS frmWiBulk AS Form
 	loB.billno = ALLTRIM(THIS.txtBill.Value)
 	loB.date = THIS.txtDate.Value
 	loB.optionbl = UPPER(ALLTRIM(THIS.txtBL.Value))
-	loB.quality = ALLTRIM(THIS.txtQlty.Value)
-	loB.colour = ALLTRIM(THIS.txtColour.Value)
+	loB.quality = UPPER(ALLTRIM(THIS.txtQlty.Value))
+	loB.colour = UPPER(ALLTRIM(THIS.txtColour.Value))
 	loB.ytype = ALLTRIM(THIS.txtYtype.Value)
 	loB.quantity = THIS.txtQty.Value
 	loB.rate = THIS.txtRate.Value
